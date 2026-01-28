@@ -34,6 +34,7 @@ public class Main {
     float debugFactor = 1;
     float deltaTime = 0.0f;
     float lastFrame = 0.0f;
+    int visualizationMode = 1;  // 1 = current visuals, 2 = distance to cities, 3 = rating
 
     public void run() {
         initGL();
@@ -75,6 +76,13 @@ public class Main {
         glfwSetKeyCallback(window, (window, key, scancode, action, mods) -> {
             if(key == GLFW_KEY_ESCAPE && action == GLFW_RELEASE)
                 glfwSetWindowShouldClose(window, true);
+            // Switch visualization modes with 1, 2, 3 keys
+            if(key == GLFW_KEY_1 && action == GLFW_RELEASE)
+                visualizationMode = 1;
+            if(key == GLFW_KEY_2 && action == GLFW_RELEASE)
+                visualizationMode = 2;
+            if(key == GLFW_KEY_3 && action == GLFW_RELEASE)
+                visualizationMode = 3;
         });
         glfwSetScrollCallback(window, this::scrollCallback);
         glfwSetCursorPosCallback(window, this::mouseCallback);
@@ -159,7 +167,7 @@ public class Main {
             glUniformMatrix4fv(vLoc, false, aView);
             glUniformMatrix4fv(pLoc, false, aProj);
 
-            mapRenderer.renderMap(provinceMap);
+            mapRenderer.renderMap(provinceMap, visualizationMode);
 
             float[] ident = new float[16];
             float[] ident2 = new float[16];

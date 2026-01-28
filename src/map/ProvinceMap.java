@@ -296,4 +296,98 @@ public class ProvinceMap {
         populateForests();
         generateRivers();  // Generate rivers after forests to avoid breaking river paths
     }
+
+    // Calculate distance from each province to the nearest city (for mode 2)
+    public int[] calculateDistancesToCities() {
+        int[] distances = new int[provinces.size()];
+        Arrays.fill(distances, Integer.MAX_VALUE);
+        
+        // Initialize distances for cities
+        for (int cityIdx : cityProvinces) {
+            distances[cityIdx] = 0;
+        }
+        
+        // BFS to calculate distances
+        List<Integer> queue = new ArrayList<>(cityProvinces);
+        Set<Integer> visited = new HashSet<>(cityProvinces);
+        
+        while (!queue.isEmpty()) {
+            int current = queue.remove(0);
+            int currentDist = distances[current];
+            
+            for (int neighbor : getAdjacentProvinces(current)) {
+                if (!visited.contains(neighbor)) {
+                    visited.add(neighbor);
+                    distances[neighbor] = currentDist + 1;
+                    queue.add(neighbor);
+                }
+            }
+        }
+        
+        return distances;
+    }
+
+    // Calculate rating for each province (for mode 3)
+    public int[] calculateRatings() {
+        int[] ratings = new int[provinces.size()];
+        
+        for (int i = 0; i < provinces.size(); i++) {
+            int rating = 0;
+            Province province = provinces.get(i);
+            
+            // Check adjacency to cities
+            boolean adjacentToCity = false;
+            boolean oneProvinceAwayFromCity = false;
+            for (int neighbor : getAdjacentProvinces(i)) {
+                if (provinces.get(neighbor).getTerrainType() == Province.TerrainType.CITY) {
+                    adjacentToCity = true;
+                    break;
+                }
+                // Check if neighbor is adjacent to a city (one province separated)
+                for (int neighborOfNeighbor : getAdjacentProvinces(neighbor)) {
+                    if (provinces.get(neighborOfNeighbor).getTerrainType() == Province.TerrainType.CITY) {
+                        oneProvinceAwayFromCity = true;
+                        break;
+                    }
+                }
+                if (oneProvinceAwayFromCity) break;
+            }
+            
+            if (adjacentToCity) {
+                rating -= 10;
+            } else if (oneProvinceAwayFromCity) {
+                rating -= 5;
+            }
+            
+            // Check adjacency to rivers
+            for (int neighbor : getAdjacentProvinces(i)) {
+                if (provinces.get(neighbor).getTerrainType() == Province.TerrainType.RIVER) {
+                    rating += 3;
+                    break;  // Only count once
+                }
+            }
+            
+            // Check if on road
+            if (province.hasRoad()) {
+                rating += 3;
+            }
+            
+            // Check forest
+            if (province.getTerrainType() == Province.TerrainType.FOREST) {
+                rating -= 5;
+            } else {
+                // Check if adjacent to any forest
+                for (int neighbor : getAdjacentProvinces(i)) {
+                    if (provinces.get(neighbor).getTerrainType() == Province.TerrainType.FOREST) {
+                        rating += 1;
+                        break;  // Only count once
+                    }
+                }
+            }
+            
+            ratings[i] = rating;
+        }
+        
+        return ratings;
+    }
 }

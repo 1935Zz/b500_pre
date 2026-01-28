@@ -111,7 +111,7 @@ public class MapRenderer {
     }
 
     // Renders a list of provinces
-    public void renderMap(ProvinceMap map) {
+    public void renderMap(ProvinceMap map, int visualizationMode) {
         if (map == null) {
             return;
         }
@@ -120,19 +120,29 @@ public class MapRenderer {
             return;
         }
 
+        // Calculate data for modes 2 and 3
+        int[] distancesToCities = null;
+        int[] ratings = null;
+        if (visualizationMode == 2) {
+            distancesToCities = map.calculateDistancesToCities();
+        } else if (visualizationMode == 3) {
+            ratings = map.calculateRatings();
+        }
+
         shader.use();
         glBindVertexArray(vao);
 
         // PASS 1: Render Filled Provinces
-        for (Province province : provinces) {
+        for (int i = 0; i < provinces.size(); i++) {
+            Province province = provinces.get(i);
             List<float[]> rawVertices = province.getVertices();
             List<Integer> indices = province.getTriangulatedVertices();
 
             // Flatten the vertices into a float array
             float[] vertices = new float[rawVertices.size() * 2];
-            for (int i = 0, j = 0; i < rawVertices.size(); i++) {
-                vertices[j++] = rawVertices.get(i)[0];
-                vertices[j++] = rawVertices.get(i)[1];
+            for (int j = 0, k = 0; j < rawVertices.size(); j++) {
+                vertices[k++] = rawVertices.get(j)[0];
+                vertices[k++] = rawVertices.get(j)[1];
             }
 
             IntBuffer indexBuffer = BufferUtils.createIntBuffer(indices.size());
@@ -147,7 +157,65 @@ public class MapRenderer {
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
             glBufferData(GL_ELEMENT_ARRAY_BUFFER, indexBuffer, GL_DYNAMIC_DRAW);
 
-            shader.createUniform3f("color", province.getColour());
+            // Determine color based on visualization mode
+            float[] color;
+            if (visualizationMode == 1) {
+                // Mode 1: Current visuals (use province's original color)
+                color = province.getColour();
+            } else if (visualizationMode == 2) {
+                // Mode 2: Distance to cities (darker = farther)
+                // Preserve original color for cities, rivers
+                if (province.getTerrainType() == Province.TerrainType.CITY ||
+                    province.getTerrainType() == Province.TerrainType.RIVER) {
+                    color = province.getColour();
+                } else {
+                    int distance = distancesToCities[i];
+                    if (distance == Integer.MAX_VALUE) {
+                        distance = 100; // Very far
+                    }
+                    // Normalize distance to 0-1 range (assuming max distance of 20)
+                    float normalized = Math.min(distance / 20.0f, 1.0f);
+                    // Use gradient from light (close) to dark (far): light green to dark green
+                    color = new float[]{
+                        0.2f + 0.2f * (1.0f - normalized),  // R: 0.2 to 0.4
+                        0.5f + 0.3f * (1.0f - normalized),   // G: 0.5 to 0.8
+                        0.1f + 0.2f * (1.0f - normalized)    // B: 0.1 to 0.3
+                    };
+                }
+            } else { // Mode 3: Rating
+                // Preserve original color for cities, rivers
+                if (province.getTerrainType() == Province.TerrainType.CITY ||
+                    province.getTerrainType() == Province.TerrainType.RIVER) {
+                    color = province.getColour();
+                } else {
+                    int rating = ratings[i];
+                    // Normalize rating to color: negative = red, positive = green, zero = yellow
+                    // Rating range approximately -15 to +10
+                    float normalized = (rating + 15.0f) / 25.0f; // Map -15 to +10 -> 0 to 1
+                    normalized = Math.max(0.0f, Math.min(1.0f, normalized));
+                    
+                    if (rating < 0) {
+                        // Negative rating: red gradient
+                        color = new float[]{
+                            0.8f + 0.2f * normalized,  // R: 0.8 to 1.0
+                            0.2f * normalized,          // G: 0.0 to 0.2
+                            0.2f * normalized           // B: 0.0 to 0.2
+                        };
+                    } else if (rating > 0) {
+                        // Positive rating: green gradient
+                        color = new float[]{
+                            0.2f * (1.0f - normalized), // R: 0.2 to 0.0
+                            0.6f + 0.4f * normalized,    // G: 0.6 to 1.0
+                            0.2f * (1.0f - normalized)   // B: 0.2 to 0.0
+                        };
+                    } else {
+                        // Zero rating: yellow
+                        color = new float[]{0.8f, 0.8f, 0.2f};
+                    }
+                }
+            }
+
+            shader.createUniform3f("color", color);
 
             glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
         }
