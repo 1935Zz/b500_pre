@@ -54,4 +54,4 @@ All modes should still show cities, roads, and rivers.
 
 ## PR链接
 
-待创建
+https://github.com/1935Zz/b500_pre/pull/1
